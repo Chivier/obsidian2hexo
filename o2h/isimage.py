@@ -1,5 +1,0 @@
-
-
-
-def isImage(fileName):
-
