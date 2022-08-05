@@ -43,6 +43,7 @@ class translator_tp:
         self.links = []
         self.date = []
         self.time = None
+        self.category = None
         self.title = ""
 
     def get_file_type(self, file_name: str):
@@ -78,13 +79,15 @@ class translator_tp:
                 tag_list = re.findall(tag_pattern, line)
                 link_list = re.findall(link_pattern, line)
                 if len(tag_list) > 0:
-                    self.tags += tag_list
+                    if len(self.tags) == 0:
+                        self.tags = tag_list
                 if len(link_list) > 0:
                     self.links += link_list
             file.close()
         # Remove first '#' from the beginning of the line
         for index in range(len(self.tags)):
-            self.tags[index] = self.tags[index][1:]
+            self.tags[index] = self.tags[index][1:].split("/")[-1]
+        self.tags = list(set(self.tags))
 
         # Update time as last modified time
         file_modify_date = (
@@ -108,9 +111,19 @@ class translator_tp:
         # print(self.date)
 
     def get_file_location(self, name):
+        """
+        finds the location of a file in obsidian
+        Args:
+         - self, name
+
+        Return:
+         - file_paths[0]
+
+        """
         name = name[3:-2].replace(" ", " ")
         target_base = self.config["obsidian_target"]
         file_paths = []
+        # searches for findpath in the target base directory
         for findpath in target_base:
             bashCommand = ["fd", name, findpath]
             # print(bashCommand)
@@ -147,8 +160,7 @@ class translator_tp:
             info_header += "  - " + tag + "\n"
         # categories info
         info_header += "categories:\n"
-        for index in range(max(2, len(self.tags))):
-            info_header += "  - " + self.tags[index] + "\n"
+        info_header += "  - " + self.category + "\n"
         # toc info
         info_header += "toc: true\n"
         info_header += "---\n"
@@ -216,6 +228,9 @@ def o2h():
     parser.add_argument(
         "-o", "--output", type=str, help="get output dir", default="/tmp/o2houtput"
     )
+    parser.add_argument(
+        "-c", "--category", type=str, help="get category", default="Skill"
+    )
     args = parser.parse_args()
     if str(args.filename)[-3:] != ".md":
         print("This is not a .md file")
@@ -224,6 +239,7 @@ def o2h():
     vm = translator_tp()
     vm.input = args.filename
     vm.output = args.output
+    vm.category = args.category
     vm.name = vm.input.split("/")[-1][0:-3]
     vm.config = getConfigurations()
 
