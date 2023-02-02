@@ -14,7 +14,7 @@ mimetypes.init()
 # Some Limits:
 # This tool can only deal with some simple situation, all including files should be written in a standalone line
 
-# Read config file
+# Read config filepython -m build
 ## Input:
 ## - config file path
 ## Output:
@@ -45,6 +45,7 @@ class translator_tp:
         self.time = None
         self.category = None
         self.title = ""
+        self.picgo = False
 
     def get_file_type(self, file_name: str):
         mimestart = mimetypes.guess_type(file_name)[0].lower()
@@ -144,7 +145,8 @@ class translator_tp:
         output_file_name = self.output + "/" + self.title.replace(" ", "-") + ".md"
         output_dir_name = self.output + "/" + self.title.replace(" ", "-")
 
-        os.mkdir(output_dir_name)
+        if not self.picgo:
+            os.mkdir(output_dir_name)
         output_file = open(output_file_name, "w")
 
         info_header = "---\n"
@@ -180,34 +182,61 @@ class translator_tp:
                     # add a new link here
                     link_file_name = re.findall(link_pattern, line)[0]
                     link_file_location = self.get_file_location(link_file_name)
+                    link_file_location = link_file_location.replace(" ", " ")
                     link_file_type = self.get_file_type(link_file_location)
-                    if link_file_type == "undefined":
+                    if link_file_type == "undefined" or link_file_type == "pdf":
                         # do not care about undefined files
                         continue
                     elif link_file_type == "image":
-                        # get detail type of an image
-                        detailed_type = self.get_file_type_detail(link_file_location)
-                        image_counter += 1
-                        target_file_name = f"image{image_counter}.{detailed_type}"
-                        target_file_location = output_dir_name + "/" + target_file_name
-                        bashCommand = ["cp", link_file_location, target_file_location]
-                        process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
-                        output, error = process.communicate()
-                        # print out image link here
-                        output_file.write(
-                            f'<img src="{target_file_name}" width="80%" height="80%">\n'
-                        )
-                    elif link_file_type == "pdf":
-                        pdf_counter += 1
-                        target_file_name = f"pdf{pdf_counter}.pdf"
-                        target_file_location = output_dir_name + "/" + target_file_name
-                        bashCommand = ["cp", link_file_location]
-                        process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
-                        output, error = process.communicate()
-                        # print out pdf link here
-                        output_file.write(
-                            str("{" + f"% pdf ./{target_file_name} \%" + "}\n")
-                        )
+                        if self.picgo:
+                            # get detail type of an image
+                            detailed_type = self.get_file_type_detail(link_file_location)
+                            image_counter += 1
+                            bashCommand = ["picgo", "upload", link_file_location]
+                            process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+                            output, error = process.communicate()
+                            output = output.decode("utf-8")
+                            # print(output.find("SUCCESS"))
+                            if output.find("SUCCESS") != -1:
+                                # Find success info
+                                success_info = output.split("\n")
+                                # print(success_info)
+                                target_file_name = ""
+                                success_info_index = len(success_info)
+                                while success_info_index >= 0:
+                                    success_info_index -= 1
+                                    if success_info[success_info_index].find("SUCCESS")!= -1:
+                                        target_file_name = success_info[success_info_index + 1]
+                                output_file.write(
+                                    f'<img src="{target_file_name}" width="80%" height="80%">\n'
+                                )
+                            else:
+                                sys.stderr.write("Picgo upload failed\n")
+                                exit(0)
+                        else:
+                            # get detail type of an image
+                            detailed_type = self.get_file_type_detail(link_file_location)
+                            image_counter += 1
+                            target_file_name = f"image{image_counter}.{detailed_type}"
+                            target_file_location = output_dir_name + "/" + target_file_name
+                            bashCommand = ["cp", link_file_location, target_file_location]
+                            process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+                            output, error = process.communicate()
+                            # print out image link here
+                            output_file.write(
+                                f'<img src="{target_file_name}" width="80%" height="80%">\n'
+                            )
+                    # elif link_file_type == "pdf":
+                    #     pdf_counter += 1
+                    #     target_file_name = f"pdf{pdf_counter}.pdf"
+                    #     target_file_location = output_dir_name + "/" + target_file_name
+                    #     bashCommand = ["cp", link_file_location]
+                    #     process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
+                    #     output, error = process.communicate()
+                    #     # print out pdf link here
+                    #     output_file.write(
+                    #         str("{" + f"% pdf ./{target_file_name} \%" + "}\n")
+                    #     )
                 else:
                     # Common Line
                     if len(line) == 1:
@@ -231,6 +260,9 @@ def o2h():
     parser.add_argument(
         "-c", "--category", type=str, help="get category", default="Skill"
     )
+    parser.add_argument(
+        "-p", "--picgo", help="use picgo", action=argparse.BooleanOptionalAction
+    )
     args = parser.parse_args()
     if str(args.filename)[-3:] != ".md":
         print("This is not a .md file")
@@ -240,6 +272,7 @@ def o2h():
     vm.input = args.filename
     vm.output = args.output
     vm.category = args.category
+    vm.picgo = args.picgo
     vm.name = vm.input.split("/")[-1][0:-3]
     vm.config = getConfigurations()
 

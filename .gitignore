@@ -4,3 +4,4 @@ output
 o2h.egg-info
 
 dist/*
+build
