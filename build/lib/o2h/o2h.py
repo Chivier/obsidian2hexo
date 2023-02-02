@@ -126,7 +126,7 @@ class translator_tp:
         file_paths = []
         # searches for findpath in the target base directory
         for findpath in target_base:
-            bashCommand = ["fd", name, findpath]
+            bashCommand = ["find", findpath, "-name", f"*{name}*"]
             # print(bashCommand)
             process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
             output, error = process.communicate()
