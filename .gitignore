@@ -2,3 +2,5 @@ env
 test
 output
 o2h.egg-info
+
+dist/*
