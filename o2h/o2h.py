@@ -21,6 +21,7 @@ mimetypes.init()
 ## - list of obsidian home paths
 def getConfigurations(config_file_path=""):
     if len(config_file_path) == 0:
+        # TODO: add Windows config file path
         config_file_path = os.path.expanduser("~") + "/.config/o2h/config.json"
 
     if os.path.isfile(config_file_path):
@@ -280,3 +281,7 @@ def o2h():
     vm.read_and_find_info()
     vm.translate()
     return 1
+
+if __name__ == "__main__":
+    args = sys.argv
+    o2h()

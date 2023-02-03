@@ -3,5 +3,6 @@ test
 output
 o2h.egg-info
 
+dist
 dist/*
 build
