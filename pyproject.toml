@@ -16,9 +16,6 @@ classifiers = [
 ]
 keywords = ["feed", "reader", "tutorial"]
 dependencies = [
-    "feedparser >= 5.2.0",
-    "html2text",
-    'tomli; python_version < "3.11"',
 ]
 requires-python = ">=3.9"
 
