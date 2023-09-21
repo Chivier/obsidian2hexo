@@ -83,8 +83,13 @@ class translator_tp:
                 if len(tag_list) > 0:
                     if len(self.tags) == 0:
                         self.tags = tag_list
+                    else:
+                        self.tags += tag_list
                 if len(link_list) > 0:
-                    self.links += link_list
+                    if len(self.links) == 0:
+                        self.links = link_list
+                    else:
+                        self.links += link_list
             file.close()
         # Remove first '#' from the beginning of the line
         for index in range(len(self.tags)):
@@ -105,12 +110,49 @@ class translator_tp:
         # Get filename as title
         self.title = self.input.split("/")[-1].split(".")[0]
 
-        # Debug info
-        # print(self.title)
-        # print(self.time)
-        # print(self.tags)
-        # print(self.links)
-        # print(self.date)
+    def handle_property(self):
+        property_pattern = r"---"
+        property_name_patter = r"^[^:]*:"
+        property_item_patter = r"[\t ]*-[\t ]*"
+        
+        with open(self.input, "r") as file:
+            for line in file:
+                # if first line is not property, then return
+                if re.match(property_pattern, line):
+                    return 0
+
+        property_count = 0
+        with open(self.input, "r") as file:
+            property_item = False
+            property_name = ""
+            property_start = -1
+
+            for line in file:
+                if re.match(property_pattern, line):
+                    if property_start == -1:
+                        property_start = 1
+                        continue
+                    if property_start == 1:
+                        break
+                if property_item:
+                    if re.match(property_item_patter, line):
+                        line = line.strip()
+                        line = line[2:]
+                        line = line.strip()
+                        self.tags.append(line)
+                        continue
+                if re.match(property_name_patter, line):
+                    property_count += 1
+                    property_item = False
+                    line = line.strip()
+                    property_parse = line.split(":", 1)
+                    property_name = property_parse[0]
+                    # property_value = property_parse[1]
+                    if property_name == "tag":
+                        property_item = True
+                    continue
+                
+                
 
     def get_file_location(self, name):
         """
@@ -120,7 +162,6 @@ class translator_tp:
 
         Return:
          - file_paths[0]
-
         """
         name = name[3:-2].replace(" ", " ")
         target_base = self.config["obsidian_target"]
@@ -141,6 +182,7 @@ class translator_tp:
         return file_paths[0]
 
     def translate(self):
+        attributes_pattern = r"^---$"
         tag_pattern = r"#[^\ ^#^\s]+"
         link_pattern = r"\!\[\[.+\]\]"
         output_file_name = self.output + "/" + self.title.replace(" ", "-") + ".md"
@@ -175,7 +217,23 @@ class translator_tp:
 
         more_tag = False
         with open(self.input) as input_file:
+            has_attribute = False
+            attributes_end = False
+            initial_line = True
             for line in input_file:
+                # Skip properties
+                if initial_line:
+                    initial_line = False
+                    if re.match(attributes_pattern, line.strip()):
+                        has_attribute = True
+                        continue
+                if has_attribute and not attributes_end:
+                    if re.match(attributes_pattern, line.strip()):
+                        attributes_end = True
+                        continue
+                    else:
+                        continue
+
                 if re.match(tag_pattern, line):
                     # tag is handled before
                     continue
@@ -279,6 +337,7 @@ def o2h():
 
     vm.create_result_folder()
     vm.read_and_find_info()
+    vm.handle_property()
     vm.translate()
     return 1
 
