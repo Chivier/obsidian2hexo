@@ -77,8 +77,11 @@ class translator_tp:
 
         # Find all links and tags in an obsidian file
         with open(self.input, "r") as file:
+            line_index = 0
             for line in file:
-                tag_list = re.findall(tag_pattern, line)
+                if line_index <= 10:
+                    tag_list = re.findall(tag_pattern, line)
+                
                 link_list = re.findall(link_pattern, line)
                 if len(tag_list) > 0:
                     if len(self.tags) == 0:
@@ -90,6 +93,8 @@ class translator_tp:
                         self.links = link_list
                     else:
                         self.links += link_list
+                
+                line_index += 1
             file.close()
         # Remove first '#' from the beginning of the line
         for index in range(len(self.tags)):
@@ -118,8 +123,11 @@ class translator_tp:
         with open(self.input, "r") as file:
             for line in file:
                 # if first line is not property, then return
-                if re.match(property_pattern, line):
+                if not re.match(property_pattern, line):
+                    print("This file has no property")
                     return 0
+                else:
+                    break
 
         property_count = 0
         with open(self.input, "r") as file:
@@ -139,7 +147,9 @@ class translator_tp:
                         line = line.strip()
                         line = line[2:]
                         line = line.strip()
-                        self.tags.append(line)
+                        if property_name == "tags" or property_name == "tag":
+                            self.tags.append(line)
+                        
                         continue
                 if re.match(property_name_patter, line):
                     property_count += 1
@@ -148,7 +158,7 @@ class translator_tp:
                     property_parse = line.split(":", 1)
                     property_name = property_parse[0]
                     # property_value = property_parse[1]
-                    if property_name == "tag":
+                    if property_name == "tags" or property_name == "tag":
                         property_item = True
                     continue
                 
