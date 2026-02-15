@@ -8,6 +8,7 @@ import mimetypes
 import datetime
 import subprocess
 import shutil
+from urllib.parse import unquote
 
 mimetypes.init()
 
@@ -73,7 +74,7 @@ class translator_tp:
 
     def read_and_find_info(self):
         tag_pattern = r"#[^\ ^#^\s]+"
-        link_pattern = r"\!\[\[.+\]\]"
+        link_pattern = r"\!\[\[.+?\]\]"
 
         # Find all links and tags in an obsidian file
         with open(self.input, "r") as file:
@@ -164,26 +165,49 @@ class translator_tp:
                 
                 
 
+    def parse_link(self, raw_link):
+        """
+        Parse a wiki-link like ![[filename.png|500]] into (filename, width).
+        Also handles URL-encoded names like CleanShot%202026-02-12%20at%2002.19.55@2x.png.
+
+        Args:
+         - raw_link: the full match string e.g. '![[image.png|500]]'
+
+        Return:
+         - (name, width) where width is None if not specified
+        """
+        inner = raw_link[3:-2]  # strip ![[ and ]]
+        # Parse optional width: ![[name|width]]
+        width = None
+        if "|" in inner:
+            parts = inner.rsplit("|", 1)
+            inner = parts[0]
+            width_str = parts[1].strip()
+            if width_str.isdigit():
+                width = int(width_str)
+        # Decode URL-encoded characters (%20 -> space, etc.)
+        inner = unquote(inner)
+        # Normalize non-breaking spaces to regular spaces
+        inner = inner.replace("\u00a0", " ")
+        return inner, width
+
     def get_file_location(self, name):
         """
         finds the location of a file in obsidian
         Args:
-         - self, name
+         - self, name (plain filename, already parsed)
 
         Return:
          - file_paths[0]
         """
-        name = name[3:-2].replace(" ", " ")
         target_base = self.config["obsidian_target"]
         file_paths = []
         # searches for findpath in the target base directory
         for findpath in target_base:
             bashCommand = ["find", findpath, "-name", f"*{name}*"]
-            # print(bashCommand)
             process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
             output, error = process.communicate()
-            file_paths = list(output.decode("utf-8").split("\n"))
-            # print(output)
+            file_paths = [p for p in output.decode("utf-8").split("\n") if p.strip()]
             if len(file_paths) > 0:
                 break
         if len(file_paths) == 0:
@@ -194,7 +218,7 @@ class translator_tp:
     def translate(self):
         attributes_pattern = r"^---$"
         tag_pattern = r"#[^\ ^#^\s]+"
-        link_pattern = r"\!\[\[.+\]\]"
+        link_pattern = r"\!\[\[.+?\]\]"
         output_file_name = self.output + "/" + self.title.replace(" ", "-") + ".md"
         output_dir_name = self.output + "/" + self.title.replace(" ", "-")
 
@@ -250,9 +274,15 @@ class translator_tp:
                 if re.match(link_pattern, line):
                     # add a new link here
                     link_file_name = re.findall(link_pattern, line)[0]
-                    link_file_location = self.get_file_location(link_file_name)
-                    link_file_location = link_file_location.replace(" ", " ")
+                    parsed_name, img_width = self.parse_link(link_file_name)
+                    link_file_location = self.get_file_location(parsed_name)
+                    link_file_location = link_file_location.replace("\u00a0", " ")
                     link_file_type = self.get_file_type(link_file_location)
+                    # Determine width attribute for img tag
+                    if img_width is not None:
+                        width_attr = f'width="{img_width}"'
+                    else:
+                        width_attr = 'width="80%" height="80%"'
                     if link_file_type == "undefined" or link_file_type == "pdf":
                         # do not care about undefined files
                         continue
@@ -265,11 +295,9 @@ class translator_tp:
                             process = subprocess.Popen(bashCommand, stdout=subprocess.PIPE)
                             output, error = process.communicate()
                             output = output.decode("utf-8")
-                            # print(output.find("SUCCESS"))
                             if output.find("SUCCESS") != -1:
                                 # Find success info
                                 success_info = output.split("\n")
-                                # print(success_info)
                                 target_file_name = ""
                                 success_info_index = len(success_info)
                                 while success_info_index >= 0:
@@ -277,7 +305,7 @@ class translator_tp:
                                     if success_info[success_info_index].find("SUCCESS")!= -1:
                                         target_file_name = success_info[success_info_index + 1]
                                 output_file.write(
-                                    f'<img src="{target_file_name}" width="80%" height="80%">\n'
+                                    f'<img src="{target_file_name}" {width_attr}>\n'
                                 )
                             else:
                                 sys.stderr.write("Picgo upload failed\n")
@@ -293,7 +321,7 @@ class translator_tp:
                             output, error = process.communicate()
                             # print out image link here
                             output_file.write(
-                                f'<img src="{target_file_name}" width="80%" height="80%">\n'
+                                f'<img src="{target_file_name}" {width_attr}>\n'
                             )
                     # elif link_file_type == "pdf":
                     #     pdf_counter += 1
@@ -320,8 +348,14 @@ class translator_tp:
                             output_file.write(line)
 
 
+__version__ = "2.1.0"
+
+
 def o2h():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
+    )
     parser.add_argument("filename", help="get the obs markdown filename", type=str)
     parser.add_argument(
         "-o", "--output", type=str, help="get output dir", default="/tmp/o2houtput"
