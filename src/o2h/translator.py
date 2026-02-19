@@ -249,7 +249,10 @@ class translator_tp:
 
         output_file.write(info_header)
 
+        list_item_pattern = re.compile(r'^[ \t]*[-*+] |^[ \t]*\d+\. ')
         more_tag = False
+        last_was_list = False
+        last_was_empty = True
         with open(self.input) as input_file:
             has_attribute = False
             attributes_end = False
@@ -338,17 +341,27 @@ class translator_tp:
                     # Common Line
                     if len(line) == 1:
                         output_file.write(line)
+                        last_was_list = False
+                        last_was_empty = True
                         continue
                     else:
+                        is_list_item = bool(list_item_pattern.match(line))
                         if more_tag is False:
                             output_file.write(line)
                             output_file.write("\n<!--more-->\n\n")
                             more_tag = True
                         else:
+                            # Insert blank line at list block boundaries
+                            if is_list_item and not last_was_list and not last_was_empty:
+                                output_file.write("\n")
+                            elif not is_list_item and last_was_list and not last_was_empty:
+                                output_file.write("\n")
                             output_file.write(line)
+                        last_was_list = is_list_item
+                        last_was_empty = False
 
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 
 def o2h():
